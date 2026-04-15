@@ -1,52 +1,44 @@
 import 'package:flutter/material.dart';
-import 'dart:math' as math;
 
-void main() => runApp(const MemViewApp());
-
-class MemViewApp extends StatelessWidget {
-  const MemViewApp({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        brightness: Brightness.dark,
-        scaffoldBackgroundColor: const Color(0xFF0E0E12), // Твой фон
-      ),
-      // Стартуем с главного экрана "ХРАНИЛИЩЕ"
-      home: const StorageScreen(),
-    );
-  }
+void main() {
+  runApp(
+    const MaterialApp(home: StorageScreen(), debugShowCheckedModeBanner: false),
+  );
 }
 
-// --- ЭКРАН 1: ГЛАВНОЕ ХРАНИЛИЩЕ ---
-class StorageScreen extends StatelessWidget {
+class StorageScreen extends StatefulWidget {
   const StorageScreen({super.key});
+
+  @override
+  State<StorageScreen> createState() => _StorageScreenState();
+}
+
+class _StorageScreenState extends State<StorageScreen> {
+  double usedGB = 178.4;
+  final double totalGB = 256.0;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFF0E0E12),
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        leading: const Icon(Icons.menu),
-        actions: const [Icon(Icons.settings_outlined), SizedBox(width: 16)],
         title: const Text(
           'ХРАНИЛИЩЕ',
-          style: TextStyle(fontWeight: FontWeight.bold),
+          style: TextStyle(fontSize: 16, letterSpacing: 2, color: Colors.white),
         ),
+        centerTitle: true,
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(horizontal: 24),
         child: Column(
           children: [
-            const Text('Pixel 7 Pro', style: TextStyle(color: Colors.grey)),
-            const SizedBox(height: 30),
-            _buildChart(), // Тот самый сегментированный круг
-            const SizedBox(height: 30),
-            _buildActionCard(), // Кнопка "Очистить"
-            const SizedBox(height: 30),
+            const SizedBox(height: 20),
+            _buildChart(),
+            const SizedBox(height: 40),
+            _buildActionCard(),
+            const SizedBox(height: 40),
             _buildCategorySection(),
           ],
         ),
@@ -54,21 +46,110 @@ class StorageScreen extends StatelessWidget {
     );
   }
 
-  // Виджет сегментированного чарта (код из предыдущего шага)
   Widget _buildChart() {
-    return SizedBox(
-      height: 200,
-      width: 200,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          CustomPaint(
-            size: const Size(200, 200),
-            painter: SegmentedChartPainter(),
+    double freeGB = totalGB - usedGB;
+    double freePercent = freeGB / totalGB;
+
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        SizedBox(
+          width: 260,
+          height: 260,
+          child: CircularProgressIndicator(
+            value: freePercent,
+            strokeWidth: 12,
+            backgroundColor: const Color(0xFF1F1F26),
+            valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFFA78BFA)),
           ),
-          const Text(
-            '178.4 GB',
-            style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
+        ),
+        Positioned(
+          top: 75,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                freeGB.toStringAsFixed(1),
+                style: const TextStyle(
+                  fontSize: 58,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                  height: 1.0,
+                ),
+              ),
+              const Text(
+                'ГБ СВОБОДНО',
+                style: TextStyle(
+                  color: Color(0xFFA78BFA),
+                  fontSize: 14,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 2,
+                ),
+              ),
+            ],
+          ),
+        ),
+        Positioned(
+          bottom: 50,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: BoxDecoration(
+              color: const Color(0xFF131317),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: const Color(0xFF2A2A32), width: 1.5),
+            ),
+            child: RichText(
+              text: TextSpan(
+                style: const TextStyle(fontSize: 13, color: Colors.white),
+                children: [
+                  TextSpan(
+                    text: 'Занято ${usedGB.toStringAsFixed(1)} ГБ ',
+                    style: const TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                  TextSpan(
+                    text: 'из ${totalGB.toInt()} ГБ',
+                    style: TextStyle(
+                      color: Colors.grey.shade500,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildActionCard() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1F1F26),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.auto_fix_high, color: Color(0xFFA78BFA)),
+          const SizedBox(width: 16),
+          const Expanded(
+            child: Text(
+              'Освободите место, удалив ненужное',
+              style: TextStyle(color: Colors.white, fontSize: 14),
+            ),
+          ),
+          TextButton(
+            onPressed: () => setState(() {
+              if (usedGB > 50) usedGB -= 10.5;
+            }),
+            child: const Text(
+              'ОЧИСТИТЬ',
+              style: TextStyle(
+                color: Color(0xFFA78BFA),
+                fontWeight: FontWeight.bold,
+              ),
+            ),
           ),
         ],
       ),
@@ -84,11 +165,10 @@ class StorageScreen extends StatelessWidget {
           style: TextStyle(
             color: Colors.grey,
             fontSize: 12,
-            letterSpacing: 1.5,
-            fontWeight: FontWeight.bold,
+            letterSpacing: 1.2,
           ),
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 24),
         _buildCategoryItem('Приложения', '54 GB', 0.6, const Color(0xFFA78BFA)),
         _buildCategoryItem(
           'Фото и видео',
@@ -107,127 +187,109 @@ class StorageScreen extends StatelessWidget {
     double progress,
     Color color,
   ) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 24),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              // Квадратная плашка иконки
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF131317),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(Icons.grid_view_rounded, size: 20, color: color),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Text(
+    return InkWell(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => FilesScreen(categoryName: title),
+          ),
+        );
+      },
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        child: Column(
+          children: [
+            Row(
+              children: [
+                Text(
                   title,
+                  style: const TextStyle(color: Colors.white, fontSize: 16),
+                ),
+                const Spacer(),
+                Text(
+                  size,
                   style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w500,
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
-              ),
-              Text(
-                size,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          // Прогресс-бар: СТРОГО БЕЗ СКРУГЛЕНИЙ
-          Container(
-            height: 6,
-            width: double.infinity,
-            color: const Color(0xFF2A2A32),
-            child: FractionallySizedBox(
-              alignment: Alignment.centerLeft,
-              widthFactor: progress,
-              child: Container(color: color),
+              ],
             ),
-          ),
-        ],
+            const SizedBox(height: 12),
+            Container(
+              height: 6,
+              width: double.infinity,
+              color: const Color(0xFF2A2A32),
+              child: FractionallySizedBox(
+                alignment: Alignment.centerLeft,
+                widthFactor: progress,
+                child: Container(color: color),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
-
-  Widget _buildActionCard() {
-    /* Код кнопки очистки */
-    return Container();
-  }
 }
 
-// --- ЭКРАН 2: ДЕТАЛИЗАЦИЯ ПРИЛОЖЕНИЙ ---
-class AppsDetailScreen extends StatelessWidget {
-  const AppsDetailScreen({super.key});
+class FilesScreen extends StatelessWidget {
+  final String categoryName;
+  const FilesScreen({super.key, required this.categoryName});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFF0E0E12),
       appBar: AppBar(
         backgroundColor: Colors.transparent,
-        title: const Text('Приложения'), // Экран из первого билда
+        elevation: 0,
+        // Явно задаем кнопку назад, чтобы она была белой
+        leading: IconButton(
+          icon: const Icon(
+            Icons.arrow_back_ios_new,
+            color: Colors.white,
+            size: 20,
+          ),
+          onPressed: () => Navigator.pop(context), // Команда возврата
+        ),
+        title: Text(
+          categoryName.toUpperCase(),
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 16,
+            letterSpacing: 1.5,
+          ),
+        ),
+        centerTitle: true,
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(24),
+      body: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          _buildAppItem('Telegram', '12.4 GB', const Color(0xFFA78BFA)),
-          _buildAppItem('Instagram', '8.2 GB', const Color(0xFFA78BFA)),
+          const Center(
+            child: Icon(Icons.folder_open, size: 80, color: Color(0xFF2A2A32)),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Здесь будет список: $categoryName',
+            style: const TextStyle(color: Colors.grey, fontSize: 16),
+          ),
+          const SizedBox(height: 32),
+          // Кнопка возврата также внутри контента для удобства
+          OutlinedButton(
+            onPressed: () => Navigator.pop(context),
+            style: OutlinedButton.styleFrom(
+              side: const BorderSide(color: Color(0xFF2A2A32)),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: const Text('ВЕРНУТЬСЯ НА ГЛАВНУЮ'),
+          ),
         ],
       ),
     );
   }
-
-  Widget _buildAppItem(String name, String size, Color color) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFF131317),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.apps, color: color),
-          const SizedBox(width: 16),
-          Expanded(child: Text(name)),
-          Text(size, style: const TextStyle(fontWeight: FontWeight.bold)),
-        ],
-      ),
-    );
-  }
-}
-
-// Тот самый Painter с четкими границами сегментов
-class SegmentedChartPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 20
-      ..strokeCap = StrokeCap.butt;
-    final rect = Rect.fromCircle(
-      center: Offset(size.width / 2, size.height / 2),
-      radius: size.width / 2,
-    );
-
-    paint.color = const Color(0xFFA78BFA); // Фиолетовый
-    canvas.drawArc(rect, -math.pi / 2, 2.0, false, paint);
-
-    paint.color = const Color(0xFFF472B6); // Розовый
-    canvas.drawArc(rect, -math.pi / 2 + 2.0, 1.5, false, paint);
-
-    paint.color = const Color(0xFFFBBF24); // Желтый
-    canvas.drawArc(rect, -math.pi / 2 + 3.5, 0.7, false, paint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
