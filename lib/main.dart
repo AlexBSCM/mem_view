@@ -1,24 +1,21 @@
 import 'package:flutter/material.dart';
 
-// --- КОНСТАНТЫ ЦВЕТОВ (Архитектурный этап 1) ---
+// --- КОНСТАНТЫ ЦВЕТОВ ---
 class AppColors {
   static const Color background = Color(0xFF0E0E12);
   static const Color card = Color(0xFF1F1F26);
-  static const Color accent = Color(0xFFA78BFA); // Фиолетовый
-  static const Color video = Color(0xFFF472B6); // Розовый
-  static const Color photo = Color(0xFF60A5FA); // Голубой
-  static const Color apps = Color(0xFFA78BFA); // Фиолетовый
-  static const Color audio = Color(0xFF34D399); // Зеленый
-  static const Color docs = Color(0xFFFBBF24); // Желтый
-  static const Color other = Color(0xFF94A3B8); // Серый
+  static const Color accent = Color(0xFFA78BFA);
+  static const Color video = Color(0xFFF472B6);
+  static const Color photo = Color(0xFF60A5FA);
+  static const Color apps = Color(0xFFA78BFA);
+  static const Color audio = Color(0xFF34D399);
+  static const Color docs = Color(0xFFFBBF24);
   static const Color textPrimary = Colors.white;
   static const Color textSecondary = Color(0xFF94A3B8);
   static const Color border = Color(0xFF2A2A32);
 }
 
-void main() {
-  runApp(const MemoryViewApp());
-}
+void main() => runApp(const MemoryViewApp());
 
 class MemoryViewApp extends StatelessWidget {
   const MemoryViewApp({super.key});
@@ -26,19 +23,17 @@ class MemoryViewApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Memory View',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         brightness: Brightness.dark,
         scaffoldBackgroundColor: AppColors.background,
-        fontFamily: 'sans-serif',
       ),
       home: const StorageScreen(),
     );
   }
 }
 
-// --- ГЛАВНЫЙ ЭКРАН (Архитектурный этап 3) ---
+// --- ГЛАВНЫЙ ЭКРАН ---
 class StorageScreen extends StatefulWidget {
   const StorageScreen({super.key});
 
@@ -47,14 +42,13 @@ class StorageScreen extends StatefulWidget {
 }
 
 class _StorageScreenState extends State<StorageScreen> {
-  // Данные (в будущем будут приходить из StorageRepository)
   double usedGB = 168.4;
   final double totalGB = 256.0;
 
   @override
   Widget build(BuildContext context) {
     final double freeGB = totalGB - usedGB;
-    final double freeProgress = freeGB / totalGB;
+    final double progress = freeGB / totalGB;
 
     return Scaffold(
       appBar: AppBar(
@@ -75,13 +69,10 @@ class _StorageScreenState extends State<StorageScreen> {
         child: Column(
           children: [
             const SizedBox(height: 20),
-            // Центрированное кольцо (StorageRing)
-            _buildStorageRing(freeGB, freeProgress),
+            _buildRing(freeGB, progress),
             const SizedBox(height: 40),
-            // Карточка быстрой очистки
             _buildActionCard(),
             const SizedBox(height: 40),
-            // Секция категорий
             _buildCategorySection(),
           ],
         ),
@@ -89,7 +80,7 @@ class _StorageScreenState extends State<StorageScreen> {
     );
   }
 
-  Widget _buildStorageRing(double freeGB, double progress) {
+  Widget _buildRing(double freeGB, double progress) {
     return Stack(
       alignment: Alignment.center,
       children: [
@@ -100,13 +91,12 @@ class _StorageScreenState extends State<StorageScreen> {
             value: progress,
             strokeWidth: 12,
             backgroundColor: AppColors.card,
-            valueColor: const AlwaysStoppedAnimation<Color>(AppColors.accent),
+            valueColor: const AlwaysStoppedAnimation(AppColors.accent),
           ),
         ),
         Positioned(
           top: 75,
           child: Column(
-            mainAxisSize: MainAxisSize.min,
             children: [
               Text(
                 freeGB.toStringAsFixed(1),
@@ -122,7 +112,6 @@ class _StorageScreenState extends State<StorageScreen> {
                   color: AppColors.accent,
                   fontSize: 13,
                   fontWeight: FontWeight.w900,
-                  letterSpacing: 1.5,
                 ),
               ),
             ],
@@ -137,24 +126,9 @@ class _StorageScreenState extends State<StorageScreen> {
               borderRadius: BorderRadius.circular(20),
               border: Border.all(color: AppColors.border),
             ),
-            child: RichText(
-              text: TextSpan(
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: AppColors.textPrimary,
-                ),
-                children: [
-                  const TextSpan(text: 'Занято '),
-                  TextSpan(
-                    text: '${usedGB.toStringAsFixed(1)} ГБ',
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  TextSpan(
-                    text: ' из ${totalGB.toInt()} ГБ',
-                    style: const TextStyle(color: AppColors.textSecondary),
-                  ),
-                ],
-              ),
+            child: Text(
+              'Занято ${usedGB.toStringAsFixed(1)} ГБ из ${totalGB.toInt()} ГБ',
+              style: const TextStyle(fontSize: 12),
             ),
           ),
         ),
@@ -171,20 +145,18 @@ class _StorageScreenState extends State<StorageScreen> {
       ),
       child: Row(
         children: [
-          const Icon(Icons.auto_fix_high, color: AppColors.accent, size: 24),
+          const Icon(Icons.auto_fix_high, color: AppColors.accent),
           const SizedBox(width: 12),
           const Expanded(
             child: Text(
-              'Освободите место, удалив ненужное',
-              style: TextStyle(fontSize: 13, color: AppColors.textPrimary),
+              'Очистить временные файлы',
+              style: TextStyle(fontSize: 13),
             ),
           ),
           TextButton(
-            onPressed: () {
-              setState(() {
-                if (usedGB > 30) usedGB -= 12.5; // Эффект очистки
-              });
-            },
+            onPressed: () => setState(() {
+              if (usedGB > 50) usedGB -= 5.5;
+            }),
             child: const Text(
               'ОЧИСТИТЬ',
               style: TextStyle(
@@ -208,73 +180,40 @@ class _StorageScreenState extends State<StorageScreen> {
             color: AppColors.textSecondary,
             fontSize: 11,
             fontWeight: FontWeight.bold,
-            letterSpacing: 1,
           ),
         ),
         const SizedBox(height: 16),
-        _buildCategoryItem(
-          'Видео',
-          82.4,
-          AppColors.video,
-          Icons.videocam_outlined,
-        ),
-        _buildCategoryItem('Фото', 12.1, AppColors.photo, Icons.image_outlined),
-        _buildCategoryItem(
-          'Приложения',
-          54.0,
-          AppColors.apps,
-          Icons.apps_outlined,
-        ),
-        _buildCategoryItem(
-          'Аудио',
-          4.2,
-          AppColors.audio,
-          Icons.audiotrack_outlined,
-        ),
-        _buildCategoryItem(
-          'Прочее',
-          15.7,
-          AppColors.other,
-          Icons.more_horiz_outlined,
+        _categoryItem('Видео', 82.4, AppColors.video, Icons.videocam_outlined),
+        _categoryItem('Фото', 12.1, AppColors.photo, Icons.image_outlined),
+        _categoryItem('Аудио', 4.2, AppColors.audio, Icons.audiotrack_outlined),
+        _categoryItem('Приложения', 54.0, AppColors.apps, Icons.apps_outlined),
+        _categoryItem(
+          'Документы',
+          1.8,
+          AppColors.docs,
+          Icons.description_outlined,
         ),
       ],
     );
   }
 
-  Widget _buildCategoryItem(
-    String title,
-    double value,
-    Color color,
-    IconData icon,
-  ) {
-    // Честный расчет прогресса относительно общего объема (Этап 3)
-    final double progress = value / totalGB;
-
+  Widget _categoryItem(String title, double value, Color color, IconData icon) {
     return InkWell(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => DetailsScreen(category: title),
-          ),
-        );
-      },
-      borderRadius: BorderRadius.circular(12),
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => DetailsScreen(category: title, color: color),
+        ),
+      ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
+        padding: const EdgeInsets.symmetric(vertical: 12),
         child: Column(
           children: [
             Row(
               children: [
                 Icon(icon, color: color, size: 20),
                 const SizedBox(width: 12),
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
+                Text(title),
                 const Spacer(),
                 Text(
                   '${value.toStringAsFixed(1)} GB',
@@ -282,24 +221,12 @@ class _StorageScreenState extends State<StorageScreen> {
                 ),
               ],
             ),
-            const SizedBox(height: 10),
-            Container(
-              height: 5,
-              width: double.infinity,
-              decoration: BoxDecoration(
-                color: AppColors.card,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: FractionallySizedBox(
-                alignment: Alignment.centerLeft,
-                widthFactor: progress.clamp(0.0, 1.0),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: color,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
-              ),
+            const SizedBox(height: 8),
+            LinearProgressIndicator(
+              value: value / totalGB,
+              backgroundColor: AppColors.card,
+              valueColor: AlwaysStoppedAnimation(color),
+              minHeight: 4,
             ),
           ],
         ),
@@ -308,10 +235,25 @@ class _StorageScreenState extends State<StorageScreen> {
   }
 }
 
-// --- ЭКРАН ДЕТАЛЕЙ (Заглушка для этапа 4) ---
-class DetailsScreen extends StatelessWidget {
+// --- ЭКРАН ДЕТАЛЕЙ С ЗАГЛУШКАМИ ФАЙЛОВ ---
+class DetailsScreen extends StatefulWidget {
   final String category;
-  const DetailsScreen({super.key, required this.category});
+  final Color color;
+  const DetailsScreen({super.key, required this.category, required this.color});
+
+  @override
+  State<DetailsScreen> createState() => _DetailsScreenState();
+}
+
+class _DetailsScreenState extends State<DetailsScreen> {
+  // Имитация списка файлов (Этап 4)
+  List<Map<String, String>> mockFiles = [
+    {'name': 'Запись_экрана_01.mp4', 'size': '1.2 GB', 'date': '12 Апр 2026'},
+    {'name': 'Фильм_в_поездку.mkv', 'size': '4.5 GB', 'date': '10 Апр 2026'},
+    {'name': 'Презентация_проект.pdf', 'size': '24 MB', 'date': '08 Апр 2026'},
+    {'name': 'Трек_05_избранное.mp3', 'size': '12 MB', 'date': '05 Апр 2026'},
+    {'name': 'Фото_с_отпуска_01.jpg', 'size': '8 MB', 'date': '01 Апр 2026'},
+  ];
 
   @override
   Widget build(BuildContext context) {
@@ -320,28 +262,120 @@ class DetailsScreen extends StatelessWidget {
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, size: 18),
+          icon: const Icon(Icons.arrow_back_ios_new, size: 20),
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
-          category.toUpperCase(),
-          style: const TextStyle(fontSize: 14),
+          widget.category.toUpperCase(),
+          style: const TextStyle(fontSize: 14, letterSpacing: 1.5),
         ),
         centerTitle: true,
       ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.folder_open, size: 64, color: AppColors.card),
-            const SizedBox(height: 16),
-            Text(
-              'Список файлов: $category',
-              style: const TextStyle(color: AppColors.textSecondary),
+      body: Column(
+        children: [
+          // Краткая инфо-панель сверху
+          Container(
+            padding: const EdgeInsets.all(24),
+            child: Row(
+              children: [
+                Icon(Icons.folder_open, color: widget.color, size: 40),
+                const SizedBox(width: 16),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '${mockFiles.length} файлов всего',
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const Text(
+                      'Отсортировано по размеру',
+                      style: TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+          const Divider(color: AppColors.border, height: 1),
+          // Список файлов (FileTile из Этапа 4)
+          Expanded(
+            child: ListView.separated(
+              itemCount: mockFiles.length,
+              separatorBuilder: (context, index) =>
+                  const Divider(color: AppColors.border, height: 1),
+              itemBuilder: (context, index) {
+                final file = mockFiles[index];
+                return ListTile(
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 8,
+                  ),
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: widget.color.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(
+                      _getFileIcon(widget.category),
+                      color: widget.color,
+                      size: 24,
+                    ),
+                  ),
+                  title: Text(
+                    file['name']!,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  subtitle: Text(
+                    '${file['date']} • ${file['size']}',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  trailing: IconButton(
+                    icon: const Icon(
+                      Icons.delete_outline,
+                      color: AppColors.textSecondary,
+                    ),
+                    onPressed: () {
+                      // Имитация удаления для проверки интерактива
+                      setState(() => mockFiles.removeAt(index));
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Файл удален (имитация)')),
+                      );
+                    },
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
       ),
     );
+  }
+
+  IconData _getFileIcon(String category) {
+    switch (category) {
+      case 'Видео':
+        return Icons.play_circle_outline;
+      case 'Фото':
+        return Icons.image_outlined;
+      case 'Аудио':
+        return Icons.music_note_outlined;
+      case 'Приложения':
+        return Icons.extension_outlined;
+      default:
+        return Icons.insert_drive_file_outlined;
+    }
   }
 }
