@@ -18,6 +18,9 @@ class AppColors {
   static const Color border = Color(0xFF2A2A32);
 }
 
+// Режимы отображения
+enum ViewMode { smallGrid, largeGrid, list }
+
 void main() => runApp(const MemoryViewApp());
 
 class MemoryViewApp extends StatelessWidget {
@@ -46,7 +49,6 @@ class _StorageScreenState extends State<StorageScreen> {
   List<File> foundVideos = [];
   List<File> foundPhotos = [];
   bool isScanning = false;
-  final double totalGB = 256.0;
 
   @override
   void initState() {
@@ -108,29 +110,22 @@ class _StorageScreenState extends State<StorageScreen> {
       }
     } catch (e) {
       if (mounted) setState(() => isScanning = false);
-      debugPrint("Scan Error: $e");
     }
   }
 
   double _calculateTotalUsedGB() {
     int totalBytes = 0;
-    for (var f in foundVideos) {
-      totalBytes += f.lengthSync();
-    }
-    for (var f in foundPhotos) {
-      totalBytes += f.lengthSync();
-    }
+    for (var f in foundVideos) totalBytes += f.lengthSync();
+    for (var f in foundPhotos) totalBytes += f.lengthSync();
     return totalBytes / (1024 * 1024 * 1024);
   }
 
   @override
   Widget build(BuildContext context) {
     double usedGB = _calculateTotalUsedGB();
-
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Colors.transparent,
-        elevation: 0,
         title: const Text(
           'MEM VIEW',
           style: TextStyle(
@@ -178,16 +173,15 @@ class _StorageScreenState extends State<StorageScreen> {
   }
 
   Widget _buildProgressRing(double used) {
-    double percent = (used / 50.0).clamp(0.0, 1.0);
     return Stack(
       alignment: Alignment.center,
       children: [
         SizedBox(
-          width: 220,
-          height: 220,
+          width: 200,
+          height: 200,
           child: CircularProgressIndicator(
-            value: percent,
-            strokeWidth: 15,
+            value: (used / 50).clamp(0, 1),
+            strokeWidth: 12,
             backgroundColor: AppColors.card,
             color: AppColors.accent,
             strokeCap: StrokeCap.round,
@@ -198,13 +192,13 @@ class _StorageScreenState extends State<StorageScreen> {
           children: [
             Text(
               used.toStringAsFixed(1),
-              style: const TextStyle(fontSize: 48, fontWeight: FontWeight.bold),
+              style: const TextStyle(fontSize: 42, fontWeight: FontWeight.bold),
             ),
             const Text(
               'ГБ НАЙДЕНО',
               style: TextStyle(
                 color: AppColors.textSecondary,
-                fontSize: 12,
+                fontSize: 10,
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -227,7 +221,6 @@ class _StorageScreenState extends State<StorageScreen> {
         border: Border.all(color: AppColors.border),
       ),
       child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
         onTap: () async {
           await Navigator.push(
             context,
@@ -239,19 +232,12 @@ class _StorageScreenState extends State<StorageScreen> {
           _performFileScan();
         },
         leading: CircleAvatar(
-          backgroundColor: color.withOpacity(0.2),
+          backgroundColor: color.withOpacity(0.1),
           child: Icon(icon, color: color),
         ),
         title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
-        subtitle: Text(
-          '${files.length} объектов',
-          style: const TextStyle(color: AppColors.textSecondary),
-        ),
-        trailing: const Icon(
-          Icons.arrow_forward_ios,
-          size: 14,
-          color: AppColors.textSecondary,
-        ),
+        subtitle: Text('${files.length} объектов'),
+        trailing: const Icon(Icons.arrow_forward_ios, size: 14),
       ),
     );
   }
@@ -261,7 +247,6 @@ class DetailsScreen extends StatefulWidget {
   final String title;
   final Color color;
   final List<File> files;
-
   const DetailsScreen({
     super.key,
     required this.title,
@@ -275,6 +260,7 @@ class DetailsScreen extends StatefulWidget {
 
 class _DetailsScreenState extends State<DetailsScreen> {
   late List<File> currentFiles;
+  ViewMode _viewMode = ViewMode.smallGrid;
 
   @override
   void initState() {
@@ -282,54 +268,21 @@ class _DetailsScreenState extends State<DetailsScreen> {
     currentFiles = List.from(widget.files);
   }
 
-  String _formatSize(int bytes) {
-    if (bytes > 1024 * 1024 * 1024)
-      return "${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB";
-    return "${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB";
+  void _toggleViewMode() {
+    setState(() {
+      if (_viewMode == ViewMode.smallGrid)
+        _viewMode = ViewMode.largeGrid;
+      else if (_viewMode == ViewMode.largeGrid)
+        _viewMode = ViewMode.list;
+      else
+        _viewMode = ViewMode.smallGrid;
+    });
   }
 
-  Future<void> _deleteFile(File file) async {
-    try {
-      final confirmed = await showDialog<bool>(
-        context: context,
-        builder: (c) => AlertDialog(
-          backgroundColor: AppColors.card,
-          title: const Text("Удалить файл?"),
-          content: const Text("Это действие нельзя будет отменить."),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(c, false),
-              child: const Text("ОТМЕНА"),
-            ),
-            TextButton(
-              onPressed: () => Navigator.pop(c, true),
-              child: const Text("УДАЛИТЬ", style: TextStyle(color: Colors.red)),
-            ),
-          ],
-        ),
-      );
-
-      if (confirmed == true) {
-        await file.delete();
-        setState(() {
-          currentFiles.removeWhere((f) => f.path == file.path);
-        });
-        if (mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(const SnackBar(content: Text("Файл успешно удален")));
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text("Ошибка удаления: $e"),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
+  IconData _getViewIcon() {
+    if (_viewMode == ViewMode.smallGrid) return Icons.grid_view_rounded;
+    if (_viewMode == ViewMode.largeGrid) return Icons.view_comfy_alt;
+    return Icons.view_list_rounded;
   }
 
   @override
@@ -340,93 +293,142 @@ class _DetailsScreenState extends State<DetailsScreen> {
           widget.title.toUpperCase(),
           style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
         ),
-        backgroundColor: AppColors.background,
+        actions: [
+          IconButton(
+            icon: Icon(_getViewIcon(), color: AppColors.accent),
+            onPressed: _toggleViewMode,
+          ),
+        ],
       ),
       body: currentFiles.isEmpty
-          ? const Center(child: Text("Папка пуста"))
-          : GridView.builder(
-              padding: const EdgeInsets.all(16),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                crossAxisSpacing: 12,
-                mainAxisSpacing: 12,
-                childAspectRatio: 0.78,
-              ),
-              itemCount: currentFiles.length,
-              itemBuilder: (context, index) {
-                final file = currentFiles[index];
-                final folder = file.parent.path.split('/').last;
-                final fileName = p.basename(file.path);
-
-                return GestureDetector(
-                  onLongPress: () => _deleteFile(file),
-                  onTap: () => _showInfo(file.path),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: AppColors.card,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: AppColors.border),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: ClipRRect(
-                            borderRadius: const BorderRadius.vertical(
-                              top: Radius.circular(16),
-                            ),
-                            child: widget.title == 'Фото'
-                                ? Image.file(
-                                    file,
-                                    fit: BoxFit.cover,
-                                    width: double.infinity,
-                                  )
-                                : VideoThumbnailView(
-                                    file: file,
-                                    color: widget.color,
-                                  ),
-                          ),
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.all(8.0),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                folder.toUpperCase(),
-                                style: TextStyle(
-                                  color: widget.color,
-                                  fontSize: 9,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                fileName,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                              Text(
-                                _formatSize(file.lengthSync()),
-                                style: const TextStyle(
-                                  color: AppColors.textSecondary,
-                                  fontSize: 10,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              },
-            ),
+          ? const Center(child: Text("Пусто"))
+          : _buildContent(),
     );
+  }
+
+  Widget _buildContent() {
+    if (_viewMode == ViewMode.list) {
+      return ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: currentFiles.length,
+        itemBuilder: (context, index) => _buildListItem(currentFiles[index]),
+      );
+    }
+
+    return GridView.builder(
+      padding: const EdgeInsets.all(16),
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: _viewMode == ViewMode.smallGrid ? 3 : 2,
+        crossAxisSpacing: 10,
+        mainAxisSpacing: 10,
+        childAspectRatio: _viewMode == ViewMode.smallGrid ? 0.8 : 0.75,
+      ),
+      itemCount: currentFiles.length,
+      itemBuilder: (context, index) => _buildGridItem(currentFiles[index]),
+    );
+  }
+
+  Widget _buildGridItem(File file) {
+    return GestureDetector(
+      onLongPress: () => _deleteFile(file),
+      onTap: () => _showInfo(file.path),
+      child: Container(
+        decoration: BoxDecoration(
+          color: AppColors.card,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: ClipRRect(
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(12),
+                ),
+                child: widget.title == 'Фото'
+                    ? Image.file(
+                        file,
+                        fit: BoxFit.cover,
+                        width: double.infinity,
+                      )
+                    : VideoThumbnailView(file: file, color: widget.color),
+              ),
+            ),
+            if (_viewMode == ViewMode.largeGrid)
+              Padding(
+                padding: const EdgeInsets.all(6.0),
+                child: Text(
+                  p.basename(file.path),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 10),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildListItem(File file) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: ListTile(
+        onLongPress: () => _deleteFile(file),
+        leading: ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: SizedBox(
+            width: 50,
+            height: 50,
+            child: widget.title == 'Фото'
+                ? Image.file(file, fit: BoxFit.cover)
+                : VideoThumbnailView(file: file, color: widget.color),
+          ),
+        ),
+        title: Text(
+          p.basename(file.path),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(fontSize: 13),
+        ),
+        subtitle: Text(
+          "${(file.lengthSync() / (1024 * 1024)).toStringAsFixed(1)} MB",
+          style: const TextStyle(fontSize: 11),
+        ),
+        trailing: const Icon(Icons.info_outline, size: 18),
+        onTap: () => _showInfo(file.path),
+      ),
+    );
+  }
+
+  Future<void> _deleteFile(File file) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        backgroundColor: AppColors.card,
+        title: const Text("Удалить?"),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(c, false),
+            child: const Text("НЕТ"),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(c, true),
+            child: const Text("ДА", style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) {
+      await file.delete();
+      setState(() => currentFiles.removeWhere((f) => f.path == file.path));
+    }
   }
 
   void _showInfo(String path) {
@@ -434,17 +436,7 @@ class _DetailsScreenState extends State<DetailsScreen> {
       context: context,
       builder: (c) => AlertDialog(
         backgroundColor: AppColors.card,
-        title: const Text("Расположение файла", style: TextStyle(fontSize: 16)),
-        content: Text(
-          path,
-          style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(c),
-            child: const Text("ОК"),
-          ),
-        ],
+        content: Text(path, style: const TextStyle(fontSize: 11)),
       ),
     );
   }
@@ -453,7 +445,6 @@ class _DetailsScreenState extends State<DetailsScreen> {
 class VideoThumbnailView extends StatelessWidget {
   final File file;
   final Color color;
-
   const VideoThumbnailView({
     super.key,
     required this.file,
@@ -466,21 +457,20 @@ class VideoThumbnailView extends StatelessWidget {
       future: VideoThumbnail.thumbnailData(
         video: file.path,
         imageFormat: ImageFormat.JPEG,
-        maxWidth: 200,
-        quality: 30,
+        maxWidth: 150,
+        quality: 20,
       ),
       builder: (context, snapshot) {
-        if (snapshot.hasData && snapshot.data != null) {
+        if (snapshot.hasData)
           return Image.memory(
             snapshot.data!,
             fit: BoxFit.cover,
             width: double.infinity,
           );
-        }
         return Container(
           color: color.withOpacity(0.1),
           child: Center(
-            child: Icon(Icons.play_circle_fill, color: color, size: 40),
+            child: Icon(Icons.play_circle_fill, color: color, size: 24),
           ),
         );
       },
