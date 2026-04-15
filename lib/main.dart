@@ -47,34 +47,7 @@ class StorageScreen extends StatelessWidget {
             const SizedBox(height: 30),
             _buildActionCard(), // Кнопка "Очистить"
             const SizedBox(height: 30),
-            // Список категорий
-            _buildCategoryRow(
-              context,
-              title: 'Приложения',
-              size: '54 GB',
-              color: const Color(0xFFA78BFA),
-              onTap: () {
-                // ПЕРЕХОД НА ВТОРОЙ ЭКРАН
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const AppsDetailScreen(),
-                  ),
-                );
-              },
-            ),
-            _buildCategoryRow(
-              context,
-              title: 'Фото и видео',
-              size: '82 GB',
-              color: const Color(0xFFF472B6),
-            ),
-            _buildCategoryRow(
-              context,
-              title: 'Другое',
-              size: '42 GB',
-              color: const Color(0xFFFBBF24),
-            ),
+            _buildCategorySection(),
           ],
         ),
       ),
@@ -102,35 +75,85 @@ class StorageScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildCategoryRow(
-    BuildContext context, {
-    required String title,
-    required String size,
-    required Color color,
-    VoidCallback? onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 16),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: const Color(0xFF131317),
-          borderRadius: BorderRadius.circular(20),
+  Widget _buildCategorySection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'ПО КАТЕГОРИЯМ',
+          style: TextStyle(
+            color: Colors.grey,
+            fontSize: 12,
+            letterSpacing: 1.5,
+            fontWeight: FontWeight.bold,
+          ),
         ),
-        child: Row(
-          children: [
-            Container(
-              width: 12,
-              height: 12,
-              decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        const SizedBox(height: 20),
+        _buildCategoryItem('Приложения', '54 GB', 0.6, const Color(0xFFA78BFA)),
+        _buildCategoryItem(
+          'Фото и видео',
+          '82 GB',
+          0.8,
+          const Color(0xFFF472B6),
+        ),
+        _buildCategoryItem('Другое', '42 GB', 0.4, const Color(0xFFFBBF24)),
+      ],
+    );
+  }
+
+  Widget _buildCategoryItem(
+    String title,
+    String size,
+    double progress,
+    Color color,
+  ) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 24),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              // Квадратная плашка иконки
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF131317),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(Icons.grid_view_rounded, size: 20, color: color),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+              Text(
+                size,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          // Прогресс-бар: СТРОГО БЕЗ СКРУГЛЕНИЙ
+          Container(
+            height: 6,
+            width: double.infinity,
+            color: const Color(0xFF2A2A32),
+            child: FractionallySizedBox(
+              alignment: Alignment.centerLeft,
+              widthFactor: progress,
+              child: Container(color: color),
             ),
-            const SizedBox(width: 16),
-            Expanded(child: Text(title, style: const TextStyle(fontSize: 16))),
-            Text(size, style: const TextStyle(color: Colors.grey)),
-            const Icon(Icons.chevron_right, color: Colors.grey),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
