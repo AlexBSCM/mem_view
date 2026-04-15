@@ -1,18 +1,18 @@
-import 'package:flutter/material.dart';
 import 'dart:io';
+import 'dart:typed_data';
+import 'package:flutter/material.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:path_provider/path_provider.dart';
+import 'package:path/path.dart' as p;
+import 'package:video_thumbnail/video_thumbnail.dart';
 
-// --- КОНСТАНТЫ ЦВЕТОВ ---
+// --- КОНСТАНТЫ СТИЛЯ ---
 class AppColors {
   static const Color background = Color(0xFF0E0E12);
   static const Color card = Color(0xFF1F1F26);
   static const Color accent = Color(0xFFA78BFA);
   static const Color video = Color(0xFFF472B6);
   static const Color photo = Color(0xFF60A5FA);
-  static const Color apps = Color(0xFFA78BFA);
-  static const Color audio = Color(0xFF34D399);
   static const Color textPrimary = Colors.white;
   static const Color textSecondary = Color(0xFF94A3B8);
   static const Color border = Color(0xFF2A2A32);
@@ -22,7 +22,6 @@ void main() => runApp(const MemoryViewApp());
 
 class MemoryViewApp extends StatelessWidget {
   const MemoryViewApp({super.key});
-
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -30,6 +29,7 @@ class MemoryViewApp extends StatelessWidget {
       theme: ThemeData(
         brightness: Brightness.dark,
         scaffoldBackgroundColor: AppColors.background,
+        useMaterial3: true,
       ),
       home: const StorageScreen(),
     );
@@ -38,134 +38,174 @@ class MemoryViewApp extends StatelessWidget {
 
 class StorageScreen extends StatefulWidget {
   const StorageScreen({super.key});
-
   @override
   State<StorageScreen> createState() => _StorageScreenState();
 }
 
 class _StorageScreenState extends State<StorageScreen> {
-  double usedGB = 0.0;
-  double totalGB = 0.0;
-  bool isLoading = true;
+  List<File> foundVideos = [];
+  List<File> foundPhotos = [];
+  bool isScanning = false;
+  final double totalGB = 256.0;
 
   @override
   void initState() {
     super.initState();
-    _initStorageAnalysis();
+    _requestPermissionsAndScan();
   }
 
-  // ЭТАП 2 и 4: Логика получения реальных данных
-  Future<void> _initStorageAnalysis() async {
-    setState(() => isLoading = true);
-
-    // 1. Запрашиваем разрешения (Важно для Android 13+)
+  Future<void> _requestPermissionsAndScan() async {
     if (Platform.isAndroid) {
+      await Permission.manageExternalStorage.request();
       final androidInfo = await DeviceInfoPlugin().androidInfo;
       if (androidInfo.version.sdkInt >= 33) {
-        await [
-          Permission.photos,
-          Permission.videos,
-          Permission.audio,
-        ].request();
+        await [Permission.photos, Permission.videos].request();
       } else {
         await Permission.storage.request();
       }
     }
+    await _performFileScan();
+  }
 
-    // 2. Получаем данные о диске через системные пути
-    // Примечание: В учебном приложении мы имитируем точные цифры из системы
-    // Для получения абсолютно точных данных в Flutter обычно пишут MethodChannel
+  Future<void> _performFileScan() async {
+    if (!mounted) return;
+    setState(() => isScanning = true);
+
+    List<File> vids = [];
+    List<File> pics = [];
+    List<String> paths = [
+      '/storage/emulated/0/Download',
+      '/storage/emulated/0/DCIM/Camera',
+      '/storage/emulated/0/Pictures',
+      '/storage/emulated/0/Movies',
+    ];
+
     try {
-      final directory = await getExternalStorageDirectory();
-      if (directory != null) {
-        // Здесь мы бы использовали нативный код для DiskSpace
-        // Пока выставим реалистичные данные на основе ответа системы
+      for (var path in paths) {
+        final dir = Directory(path);
+        if (await dir.exists()) {
+          final entities = dir.listSync(recursive: false);
+          for (var e in entities) {
+            if (e is File) {
+              final ext = p.extension(e.path).toLowerCase();
+              if (['.mp4', '.mkv', '.mov', '.3gp'].contains(ext)) vids.add(e);
+              if (['.jpg', '.jpeg', '.png', '.webp', '.heic'].contains(ext))
+                pics.add(e);
+            }
+          }
+        }
+      }
+
+      vids.sort((a, b) => b.lengthSync().compareTo(a.lengthSync()));
+      pics.sort((a, b) => b.lengthSync().compareTo(a.lengthSync()));
+
+      if (mounted) {
         setState(() {
-          usedGB = 174.2; // Пример реально считанных данных
-          totalGB = 256.0;
-          isLoading = false;
+          foundVideos = vids;
+          foundPhotos = pics;
+          isScanning = false;
         });
       }
     } catch (e) {
-      debugPrint("Ошибка при чтении диска: $e");
-      setState(() => isLoading = false);
+      if (mounted) setState(() => isScanning = false);
+      debugPrint("Scan Error: $e");
     }
+  }
+
+  double _calculateTotalUsedGB() {
+    int totalBytes = 0;
+    for (var f in foundVideos) {
+      totalBytes += f.lengthSync();
+    }
+    for (var f in foundPhotos) {
+      totalBytes += f.lengthSync();
+    }
+    return totalBytes / (1024 * 1024 * 1024);
   }
 
   @override
   Widget build(BuildContext context) {
-    final double freeGB = totalGB - usedGB;
-    final double progress = totalGB > 0 ? (freeGB / totalGB) : 0;
+    double usedGB = _calculateTotalUsedGB();
 
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         title: const Text(
-          'АНАЛИЗАТОР ХРАНИЛИЩА',
+          'MEM VIEW',
           style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.bold,
-            letterSpacing: 2,
+            letterSpacing: 4,
+            fontSize: 16,
+            fontWeight: FontWeight.w900,
           ),
         ),
         centerTitle: true,
       ),
-      body: isLoading
-          ? const Center(
-              child: CircularProgressIndicator(color: AppColors.accent),
-            )
-          : RefreshIndicator(
-              onRefresh: _initStorageAnalysis,
-              child: SingleChildScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: Column(
-                  children: [
-                    const SizedBox(height: 20),
-                    _buildRing(freeGB, progress),
-                    const SizedBox(height: 40),
-                    _buildActionCard(),
-                    const SizedBox(height: 40),
-                    _buildCategorySection(),
-                  ],
-                ),
+      body: RefreshIndicator(
+        onRefresh: _performFileScan,
+        color: AppColors.accent,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          child: Column(
+            children: [
+              const SizedBox(height: 20),
+              _buildProgressRing(usedGB),
+              const SizedBox(height: 40),
+              _categoryCard(
+                'Видео',
+                foundVideos,
+                AppColors.video,
+                Icons.videocam_outlined,
               ),
-            ),
+              const SizedBox(height: 16),
+              _categoryCard(
+                'Фото',
+                foundPhotos,
+                AppColors.photo,
+                Icons.image_outlined,
+              ),
+              if (isScanning)
+                const Padding(
+                  padding: EdgeInsets.only(top: 30),
+                  child: CircularProgressIndicator(color: AppColors.accent),
+                ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
-  Widget _buildRing(double freeGB, double progress) {
+  Widget _buildProgressRing(double used) {
+    double percent = (used / 50.0).clamp(0.0, 1.0);
     return Stack(
       alignment: Alignment.center,
       children: [
         SizedBox(
-          width: 260,
-          height: 260,
+          width: 220,
+          height: 220,
           child: CircularProgressIndicator(
-            value: progress,
-            strokeWidth: 12,
+            value: percent,
+            strokeWidth: 15,
             backgroundColor: AppColors.card,
-            valueColor: const AlwaysStoppedAnimation(AppColors.accent),
+            color: AppColors.accent,
+            strokeCap: StrokeCap.round,
           ),
         ),
         Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              freeGB.toStringAsFixed(1),
-              style: const TextStyle(
-                fontSize: 58,
-                fontWeight: FontWeight.bold,
-                height: 1.0,
-              ),
+              used.toStringAsFixed(1),
+              style: const TextStyle(fontSize: 48, fontWeight: FontWeight.bold),
             ),
             const Text(
-              'ГБ СВОБОДНО',
+              'ГБ НАЙДЕНО',
               style: TextStyle(
-                color: AppColors.accent,
-                fontSize: 13,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 1.5,
+                color: AppColors.textSecondary,
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
               ),
             ),
           ],
@@ -174,156 +214,276 @@ class _StorageScreenState extends State<StorageScreen> {
     );
   }
 
-  Widget _buildActionCard() {
+  Widget _categoryCard(
+    String title,
+    List<File> files,
+    Color color,
+    IconData icon,
+  ) {
     return Container(
-      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppColors.card,
         borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.border),
       ),
-      child: Row(
-        children: [
-          const Icon(Icons.security, color: AppColors.accent, size: 24),
-          const SizedBox(width: 12),
-          const Expanded(
-            child: Text('Разрешения получены', style: TextStyle(fontSize: 13)),
-          ),
-          TextButton(
-            onPressed: _initStorageAnalysis,
-            child: const Text(
-              'ОБНОВИТЬ',
-              style: TextStyle(
-                color: AppColors.accent,
-                fontWeight: FontWeight.bold,
-              ),
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+        onTap: () async {
+          await Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (c) =>
+                  DetailsScreen(title: title, color: color, files: files),
             ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCategorySection() {
-    return Column(
-      children: [
-        _categoryItem('Видео', 82.4, AppColors.video, Icons.videocam_outlined),
-        _categoryItem('Фото', 12.1, AppColors.photo, Icons.image_outlined),
-        _categoryItem('Аудио', 4.2, AppColors.audio, Icons.audiotrack_outlined),
-        _categoryItem('Приложения', 54.0, AppColors.apps, Icons.apps_outlined),
-      ],
-    );
-  }
-
-  Widget _categoryItem(String title, double value, Color color, IconData icon) {
-    return InkWell(
-      onTap: () => Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => DetailsScreen(category: title, color: color),
+          );
+          _performFileScan();
+        },
+        leading: CircleAvatar(
+          backgroundColor: color.withOpacity(0.2),
+          child: Icon(icon, color: color),
         ),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        child: Column(
-          children: [
-            Row(
-              children: [
-                Icon(icon, color: color, size: 20),
-                const SizedBox(width: 12),
-                Text(title),
-                const Spacer(),
-                Text(
-                  '${value.toStringAsFixed(1)} GB',
-                  style: const TextStyle(fontWeight: FontWeight.bold),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            LinearProgressIndicator(
-              value: value / totalGB,
-              backgroundColor: AppColors.card,
-              valueColor: AlwaysStoppedAnimation(color),
-              minHeight: 4,
-            ),
-          ],
+        title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+        subtitle: Text(
+          '${files.length} объектов',
+          style: const TextStyle(color: AppColors.textSecondary),
+        ),
+        trailing: const Icon(
+          Icons.arrow_forward_ios,
+          size: 14,
+          color: AppColors.textSecondary,
         ),
       ),
     );
   }
 }
 
-// --- ЭКРАН ДЕТАЛЕЙ (Этап 4) ---
 class DetailsScreen extends StatefulWidget {
-  final String category;
+  final String title;
   final Color color;
-  const DetailsScreen({super.key, required this.category, required this.color});
+  final List<File> files;
+
+  const DetailsScreen({
+    super.key,
+    required this.title,
+    required this.color,
+    required this.files,
+  });
 
   @override
   State<DetailsScreen> createState() => _DetailsScreenState();
 }
 
 class _DetailsScreenState extends State<DetailsScreen> {
-  bool isSelectionMode = false;
-  Set<int> selectedIndices = {};
-  List<Map<String, String>> files = [
-    {'name': 'IMG_2026_04_15.jpg', 'size': '4.2 MB', 'date': 'Сегодня'},
-    {'name': 'Video_Record_HD.mp4', 'size': '1.1 GB', 'date': 'Вчера'},
-    {'name': 'Audio_Track_01.mp3', 'size': '12 MB', 'date': '12.04.2026'},
-  ];
+  late List<File> currentFiles;
+
+  @override
+  void initState() {
+    super.initState();
+    currentFiles = List.from(widget.files);
+  }
+
+  String _formatSize(int bytes) {
+    if (bytes > 1024 * 1024 * 1024)
+      return "${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB";
+    return "${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB";
+  }
+
+  Future<void> _deleteFile(File file) async {
+    try {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (c) => AlertDialog(
+          backgroundColor: AppColors.card,
+          title: const Text("Удалить файл?"),
+          content: const Text("Это действие нельзя будет отменить."),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(c, false),
+              child: const Text("ОТМЕНА"),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(c, true),
+              child: const Text("УДАЛИТЬ", style: TextStyle(color: Colors.red)),
+            ),
+          ],
+        ),
+      );
+
+      if (confirmed == true) {
+        await file.delete();
+        setState(() {
+          currentFiles.removeWhere((f) => f.path == file.path);
+        });
+        if (mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text("Файл успешно удален")));
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Ошибка удаления: $e"),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
         title: Text(
-          isSelectionMode
-              ? 'ВЫБРАНО: ${selectedIndices.length}'
-              : widget.category,
+          widget.title.toUpperCase(),
+          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
         ),
-        leading: IconButton(
-          icon: Icon(isSelectionMode ? Icons.close : Icons.arrow_back_ios_new),
-          onPressed: () => isSelectionMode
-              ? setState(() {
-                  isSelectionMode = false;
-                  selectedIndices.clear();
-                })
-              : Navigator.pop(context),
-        ),
+        backgroundColor: AppColors.background,
       ),
-      body: ListView.builder(
-        itemCount: files.length,
-        itemBuilder: (context, index) {
-          final isSelected = selectedIndices.contains(index);
-          return ListTile(
-            onTap: isSelectionMode
-                ? () => setState(
-                    () => isSelected
-                        ? selectedIndices.remove(index)
-                        : selectedIndices.add(index),
-                  )
-                : null,
-            leading: isSelectionMode
-                ? Checkbox(
-                    value: isSelected,
-                    onChanged: (v) => setState(
-                      () => v!
-                          ? selectedIndices.add(index)
-                          : selectedIndices.remove(index),
+      body: currentFiles.isEmpty
+          ? const Center(child: Text("Папка пуста"))
+          : GridView.builder(
+              padding: const EdgeInsets.all(16),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                crossAxisSpacing: 12,
+                mainAxisSpacing: 12,
+                childAspectRatio: 0.78,
+              ),
+              itemCount: currentFiles.length,
+              itemBuilder: (context, index) {
+                final file = currentFiles[index];
+                final folder = file.parent.path.split('/').last;
+                final fileName = p.basename(file.path);
+
+                return GestureDetector(
+                  onLongPress: () => _deleteFile(file),
+                  onTap: () => _showInfo(file.path),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: AppColors.card,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: AppColors.border),
                     ),
-                  )
-                : Icon(Icons.file_present, color: widget.color),
-            title: Text(files[index]['name']!),
-            subtitle: Text(files[index]['size']!),
-            trailing: !isSelectionMode
-                ? IconButton(
-                    icon: const Icon(Icons.delete),
-                    onPressed: () => setState(() => isSelectionMode = true),
-                  )
-                : null,
-          );
-        },
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: ClipRRect(
+                            borderRadius: const BorderRadius.vertical(
+                              top: Radius.circular(16),
+                            ),
+                            child: widget.title == 'Фото'
+                                ? Image.file(
+                                    file,
+                                    fit: BoxFit.cover,
+                                    width: double.infinity,
+                                  )
+                                : VideoThumbnailView(
+                                    file: file,
+                                    color: widget.color,
+                                  ),
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.all(8.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                folder.toUpperCase(),
+                                style: TextStyle(
+                                  color: widget.color,
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                fileName,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              Text(
+                                _formatSize(file.lengthSync()),
+                                style: const TextStyle(
+                                  color: AppColors.textSecondary,
+                                  fontSize: 10,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+    );
+  }
+
+  void _showInfo(String path) {
+    showDialog(
+      context: context,
+      builder: (c) => AlertDialog(
+        backgroundColor: AppColors.card,
+        title: const Text("Расположение файла", style: TextStyle(fontSize: 16)),
+        content: Text(
+          path,
+          style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(c),
+            child: const Text("ОК"),
+          ),
+        ],
       ),
+    );
+  }
+}
+
+class VideoThumbnailView extends StatelessWidget {
+  final File file;
+  final Color color;
+
+  const VideoThumbnailView({
+    super.key,
+    required this.file,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<Uint8List?>(
+      future: VideoThumbnail.thumbnailData(
+        video: file.path,
+        imageFormat: ImageFormat.JPEG,
+        maxWidth: 200,
+        quality: 30,
+      ),
+      builder: (context, snapshot) {
+        if (snapshot.hasData && snapshot.data != null) {
+          return Image.memory(
+            snapshot.data!,
+            fit: BoxFit.cover,
+            width: double.infinity,
+          );
+        }
+        return Container(
+          color: color.withOpacity(0.1),
+          child: Center(
+            child: Icon(Icons.play_circle_fill, color: color, size: 40),
+          ),
+        );
+      },
     );
   }
 }
