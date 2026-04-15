@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:io';
 
 // --- КОНСТАНТЫ ЦВЕТОВ ---
 class AppColors {
@@ -33,7 +34,6 @@ class MemoryViewApp extends StatelessWidget {
   }
 }
 
-// --- ГЛАВНЫЙ ЭКРАН ---
 class StorageScreen extends StatefulWidget {
   const StorageScreen({super.key});
 
@@ -42,8 +42,29 @@ class StorageScreen extends StatefulWidget {
 }
 
 class _StorageScreenState extends State<StorageScreen> {
-  double usedGB = 168.4;
-  final double totalGB = 256.0;
+  // Начальные значения (заглушки, которые заменятся при инициализации)
+  double usedGB = 0.0;
+  double totalGB = 256.0; // По умолчанию для красоты
+  bool isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadStorageData();
+  }
+
+  // ЭТАП 2: Логика получения данных
+  Future<void> _loadStorageData() async {
+    // В реальном приложении здесь будет вызов platform-specific кода
+    // Имитируем задержку чтения диска
+    await Future.delayed(const Duration(seconds: 1));
+
+    setState(() {
+      usedGB = 142.8; // Здесь позже будет результат сканирования папок
+      totalGB = 256.0;
+      isLoading = false;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -64,19 +85,23 @@ class _StorageScreenState extends State<StorageScreen> {
         ),
         centerTitle: true,
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 24),
-        child: Column(
-          children: [
-            const SizedBox(height: 20),
-            _buildRing(freeGB, progress),
-            const SizedBox(height: 40),
-            _buildActionCard(),
-            const SizedBox(height: 40),
-            _buildCategorySection(),
-          ],
-        ),
-      ),
+      body: isLoading
+          ? const Center(
+              child: CircularProgressIndicator(color: AppColors.accent),
+            )
+          : SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Column(
+                children: [
+                  const SizedBox(height: 20),
+                  _buildRing(freeGB, progress),
+                  const SizedBox(height: 40),
+                  _buildActionCard(),
+                  const SizedBox(height: 40),
+                  _buildCategorySection(),
+                ],
+              ),
+            ),
     );
   }
 
@@ -149,16 +174,14 @@ class _StorageScreenState extends State<StorageScreen> {
           const SizedBox(width: 12),
           const Expanded(
             child: Text(
-              'Очистить временные файлы',
+              'Анализ системы завершен',
               style: TextStyle(fontSize: 13),
             ),
           ),
           TextButton(
-            onPressed: () => setState(() {
-              if (usedGB > 50) usedGB -= 5.5;
-            }),
+            onPressed: () => _loadStorageData(), // Перезагрузка данных
             child: const Text(
-              'ОЧИСТИТЬ',
+              'ОБНОВИТЬ',
               style: TextStyle(
                 color: AppColors.accent,
                 fontWeight: FontWeight.bold,
@@ -187,12 +210,6 @@ class _StorageScreenState extends State<StorageScreen> {
         _categoryItem('Фото', 12.1, AppColors.photo, Icons.image_outlined),
         _categoryItem('Аудио', 4.2, AppColors.audio, Icons.audiotrack_outlined),
         _categoryItem('Приложения', 54.0, AppColors.apps, Icons.apps_outlined),
-        _categoryItem(
-          'Документы',
-          1.8,
-          AppColors.docs,
-          Icons.description_outlined,
-        ),
       ],
     );
   }
@@ -235,7 +252,6 @@ class _StorageScreenState extends State<StorageScreen> {
   }
 }
 
-// --- ЭКРАН ДЕТАЛЕЙ С ЗАГЛУШКАМИ ФАЙЛОВ ---
 class DetailsScreen extends StatefulWidget {
   final String category;
   final Color color;
@@ -246,13 +262,13 @@ class DetailsScreen extends StatefulWidget {
 }
 
 class _DetailsScreenState extends State<DetailsScreen> {
-  // Имитация списка файлов (Этап 4)
+  bool isSelectionMode = false;
+  Set<int> selectedIndices = {};
+
   List<Map<String, String>> mockFiles = [
-    {'name': 'Запись_экрана_01.mp4', 'size': '1.2 GB', 'date': '12 Апр 2026'},
-    {'name': 'Фильм_в_поездку.mkv', 'size': '4.5 GB', 'date': '10 Апр 2026'},
-    {'name': 'Презентация_проект.pdf', 'size': '24 MB', 'date': '08 Апр 2026'},
-    {'name': 'Трек_05_избранное.mp3', 'size': '12 MB', 'date': '05 Апр 2026'},
-    {'name': 'Фото_с_отпуска_01.jpg', 'size': '8 MB', 'date': '01 Апр 2026'},
+    {'name': 'Video_File_01.mp4', 'size': '1.2 GB', 'date': '12.04.2026'},
+    {'name': 'Movie_2026.mkv', 'size': '4.5 GB', 'date': '10.04.2026'},
+    {'name': 'Image_001.jpg', 'size': '4 MB', 'date': '09.04.2026'},
   ];
 
   @override
@@ -262,120 +278,61 @@ class _DetailsScreenState extends State<DetailsScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, size: 20),
-          onPressed: () => Navigator.pop(context),
+          icon: Icon(
+            isSelectionMode ? Icons.close : Icons.arrow_back_ios_new,
+            size: 20,
+          ),
+          onPressed: () => isSelectionMode
+              ? setState(() {
+                  isSelectionMode = false;
+                  selectedIndices.clear();
+                })
+              : Navigator.pop(context),
         ),
         title: Text(
-          widget.category.toUpperCase(),
-          style: const TextStyle(fontSize: 14, letterSpacing: 1.5),
+          isSelectionMode
+              ? 'ВЫБРАНО: ${selectedIndices.length}'
+              : widget.category.toUpperCase(),
+          style: const TextStyle(fontSize: 14),
         ),
         centerTitle: true,
       ),
-      body: Column(
-        children: [
-          // Краткая инфо-панель сверху
-          Container(
-            padding: const EdgeInsets.all(24),
-            child: Row(
-              children: [
-                Icon(Icons.folder_open, color: widget.color, size: 40),
-                const SizedBox(width: 16),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '${mockFiles.length} файлов всего',
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
+      body: ListView.separated(
+        itemCount: mockFiles.length,
+        separatorBuilder: (context, index) =>
+            const Divider(color: AppColors.border, height: 1),
+        itemBuilder: (context, index) {
+          final isSelected = selectedIndices.contains(index);
+          return ListTile(
+            onTap: isSelectionMode
+                ? () => setState(
+                    () => isSelected
+                        ? selectedIndices.remove(index)
+                        : selectedIndices.add(index),
+                  )
+                : null,
+            leading: isSelectionMode
+                ? Checkbox(
+                    value: isSelected,
+                    activeColor: AppColors.accent,
+                    onChanged: (v) => setState(
+                      () => v!
+                          ? selectedIndices.add(index)
+                          : selectedIndices.remove(index),
                     ),
-                    const Text(
-                      'Отсортировано по размеру',
-                      style: TextStyle(
-                        color: AppColors.textSecondary,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          const Divider(color: AppColors.border, height: 1),
-          // Список файлов (FileTile из Этапа 4)
-          Expanded(
-            child: ListView.separated(
-              itemCount: mockFiles.length,
-              separatorBuilder: (context, index) =>
-                  const Divider(color: AppColors.border, height: 1),
-              itemBuilder: (context, index) {
-                final file = mockFiles[index];
-                return ListTile(
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 24,
-                    vertical: 8,
-                  ),
-                  leading: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: widget.color.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Icon(
-                      _getFileIcon(widget.category),
-                      color: widget.color,
-                      size: 24,
-                    ),
-                  ),
-                  title: Text(
-                    file['name']!,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  subtitle: Text(
-                    '${file['date']} • ${file['size']}',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                  trailing: IconButton(
-                    icon: const Icon(
-                      Icons.delete_outline,
-                      color: AppColors.textSecondary,
-                    ),
-                    onPressed: () {
-                      // Имитация удаления для проверки интерактива
-                      setState(() => mockFiles.removeAt(index));
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Файл удален (имитация)')),
-                      );
-                    },
-                  ),
-                );
-              },
-            ),
-          ),
-        ],
+                  )
+                : Icon(Icons.insert_drive_file, color: widget.color),
+            title: Text(mockFiles[index]['name']!),
+            subtitle: Text(mockFiles[index]['size']!),
+            trailing: !isSelectionMode
+                ? IconButton(
+                    icon: const Icon(Icons.delete_outline),
+                    onPressed: () => setState(() => isSelectionMode = true),
+                  )
+                : null,
+          );
+        },
       ),
     );
-  }
-
-  IconData _getFileIcon(String category) {
-    switch (category) {
-      case 'Видео':
-        return Icons.play_circle_outline;
-      case 'Фото':
-        return Icons.image_outlined;
-      case 'Аудио':
-        return Icons.music_note_outlined;
-      case 'Приложения':
-        return Icons.extension_outlined;
-      default:
-        return Icons.insert_drive_file_outlined;
-    }
   }
 }
